@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: quiniesys_test
+          POSTGRES_USER: quiniesys
+          POSTGRES_PASSWORD: test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt pytest pytest-asyncio
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://quiniesys:test_pass@localhost:5432/quiniesys_test
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: test-secret-key
+        run: pytest tests/ -v
+
+  test-ml-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install ML deps (core only)
+        run: pip install numpy pandas scipy scikit-learn xgboost lightgbm pytest
+      - name: Run ML tests
+        working-directory: ml-engine
+        run: pytest tests/ -v
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps
+        working-directory: frontend
+        run: npm ci
+      - name: Type check
+        working-directory: frontend
+        run: npm run type-check
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-ml-engine, test-frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build all images
+        run: docker compose build

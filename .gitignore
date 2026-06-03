@@ -1,0 +1,56 @@
+# Environment
+.env
+*.env.local
+
+# Claude Code
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.pyc
+
+# ML models (large binaries)
+ml-engine/models/saved/
+*.joblib
+*.keras
+*.h5
+*.pkl
+
+# Node
+node_modules/
+.next/
+frontend/.next/
+frontend/out/
+
+# Docker volumes / data
+postgres_data/
+grafana_data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+celerybeat-schedule
+celerybeat.pid
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
