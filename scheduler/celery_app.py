@@ -13,18 +13,20 @@ app = Celery(
 )
 
 app.conf.beat_schedule = {
-    "etl-every-6-hours": {
-        "task": "tasks.etl.run_etl_pipeline",
+    # Ciclo principal: sync datos reales + regenerar predicciones cada 6 horas
+    # Activo siempre; antes del 11 Jun solo actualiza ELO/rankings, sin partidos nuevos
+    "sync-and-predict-every-6h": {
+        "task": "tasks.predictions.sync_and_predict",
         "schedule": crontab(minute=0, hour="*/6"),
     },
-    "daily-predictions": {
-        "task": "tasks.predictions.generate_all_predictions",
-        "schedule": crontab(minute=30, hour=4),
+
+    # ETL adicional: descarga datos de fuentes externas cada 6 horas (offset 30 min)
+    "etl-every-6h": {
+        "task": "tasks.etl.run_etl_pipeline",
+        "schedule": crontab(minute=30, hour="*/6"),
     },
-    "daily-rankings": {
-        "task": "tasks.predictions.update_rankings",
-        "schedule": crontab(minute=0, hour=5),
-    },
+
+    # Reentrenamiento ML semanal (lunes 2am)
     "weekly-model-training": {
         "task": "tasks.training.train_models",
         "schedule": crontab(minute=0, hour=2, day_of_week=1),

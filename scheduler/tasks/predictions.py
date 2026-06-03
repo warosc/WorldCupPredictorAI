@@ -3,6 +3,7 @@ Tasks for generating predictions and updating rankings.
 """
 import logging
 import os
+from datetime import datetime, timezone
 
 import httpx
 
@@ -13,12 +14,54 @@ logger = logging.getLogger(__name__)
 API_BASE = os.getenv("API_URL", "http://api:8000")
 ML_BASE = os.getenv("ML_ENGINE_URL", "http://ml-engine:8001")
 
+# El Mundial 2026 empieza el 11 de junio
+TOURNAMENT_START = datetime(2026, 6, 11, tzinfo=timezone.utc)
+
+
+@app.task
+def sync_and_predict():
+    """
+    Ciclo completo cada 6h:
+    1. Sincroniza equipos y partidos desde football-data.org
+    2. Regenera predicciones ML para todos los partidos programados
+    """
+    now = datetime.now(timezone.utc)
+    logger.info("Iniciando ciclo sync_and_predict — %s", now.isoformat())
+
+    with httpx.Client(base_url=API_BASE, timeout=60) as client:
+        # Paso 1: sync datos reales
+        try:
+            sync_resp = client.post("/worldcup/sync")
+            sync_data = sync_resp.json()
+            logger.info(
+                "Sync completado: %d equipos, %d partidos",
+                sync_data.get("teams", {}).get("total", 0),
+                sync_data.get("matches", {}).get("total", 0),
+            )
+        except Exception as exc:
+            logger.error("Sync falló: %s", exc)
+
+        # Paso 2: regenerar predicciones
+        try:
+            pred_resp = client.post("/predictions/generate")
+            pred_data = pred_resp.json()
+            logger.info("Predicciones generadas: %d", pred_data.get("generated", 0))
+        except Exception as exc:
+            logger.error("Predictions falló: %s", exc)
+
+        # Paso 3: actualizar rankings ELO si hay partidos terminados
+        if now >= TOURNAMENT_START:
+            try:
+                client.post("/rankings/recalculate")
+            except Exception:
+                pass  # endpoint opcional, no crítico
+
 
 @app.task
 def generate_all_predictions():
+    """Tarea legacy — usar sync_and_predict en su lugar."""
     logger.info("Generating predictions for all scheduled matches")
 
-    # Keep both clients open for the full duration of the task
     with httpx.Client(base_url=API_BASE, timeout=30) as api_client, \
          httpx.Client(base_url=ML_BASE, timeout=60) as ml_client:
 
