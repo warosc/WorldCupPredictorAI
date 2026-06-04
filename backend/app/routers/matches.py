@@ -39,7 +39,6 @@ async def get_match(match_id: UUID, db: AsyncSession = Depends(get_db)):
 async def create_match(
     data: MatchCreate,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_analyst),
 ):
     match = Match(**data.model_dump())
     db.add(match)

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.database import get_db
+from app.models.historical_result import HistoricalResult
 from app.models.match import Match
 from app.models.ranking import Ranking
 from app.models.team import Team
@@ -196,10 +197,35 @@ async def sync_worldcup(db: AsyncSession = Depends(get_db)):
                 db.add(match)
                 matches_created += 1
 
+            # Copy finished matches to historical_results for H2H and ML training
+            if status == "finished" and home_goals is not None and away_goals is not None:
+                existing_hist = await db.execute(
+                    select(HistoricalResult).where(
+                        HistoricalResult.home_team_id == home_uuid,
+                        HistoricalResult.away_team_id == away_uuid,
+                        HistoricalResult.match_date == match_date.date(),
+                    )
+                )
+                if not existing_hist.scalar_one_or_none():
+                    db.add(HistoricalResult(
+                        id=uuid4(),
+                        home_team_id=home_uuid,
+                        away_team_id=away_uuid,
+                        match_date=match_date.date(),
+                        competition="FIFA World Cup 2026",
+                        home_goals=home_goals,
+                        away_goals=away_goals,
+                        neutral_venue=True,
+                    ))
+
     await db.commit()
+
+    # Count historical results
+    hist_count = await db.scalar(select(func.count(HistoricalResult.id)))
 
     return {
         "teams": {"created": teams_created, "updated": teams_updated, "total": len(fd_teams)},
         "matches": {"created": matches_created, "updated": matches_updated, "total": len(fd_matches)},
+        "historical_results": hist_count,
         "message": "Sincronización completada. Ejecuta POST /predictions/generate para generar predicciones.",
     }

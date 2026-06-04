@@ -13,6 +13,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.match import Match
 from app.models.prediction import Prediction
+from app.models.simulation import Simulation
 from app.models.team import Team
 from app.schemas.prediction import PredictionOut
 
@@ -218,6 +219,24 @@ async def generate_predictions(db: AsyncSession = Depends(get_db)):
                     quiniela_recommendation=pred_data.get("quiniela_recommendation"),
                 )
                 db.add(pred)
+
+                # Guardar simulación Monte Carlo
+                mc = pred_data.get("monte_carlo")
+                if mc:
+                    await db.execute(
+                        delete(Simulation).where(Simulation.match_id == match.id)
+                    )
+                    sim = Simulation(
+                        id=uuid4(),
+                        match_id=match.id,
+                        num_simulations=mc.get("num_simulations", 100000),
+                        home_win_count=mc.get("home_win_count"),
+                        draw_count=mc.get("draw_count"),
+                        away_win_count=mc.get("away_win_count"),
+                        score_distribution=mc.get("score_distribution"),
+                    )
+                    db.add(sim)
+
                 generated.append({
                     "match": f"{home.name} vs {away.name}",
                     "date": match.match_date.strftime("%Y-%m-%d"),

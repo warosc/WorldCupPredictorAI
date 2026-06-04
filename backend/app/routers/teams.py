@@ -101,7 +101,6 @@ async def get_team(team_id: UUID, db: AsyncSession = Depends(get_db)):
 async def create_team(
     data: TeamCreate,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_analyst),
 ):
     team = Team(**data.model_dump())
     db.add(team)
