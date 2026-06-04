@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { RichPrediction } from "@/lib/api";
 
 const CONFIDENCE_STYLE: Record<string, { border: string; badge: string; label: string }> = {
@@ -64,18 +65,38 @@ export default function MatchCard({ match }: { match: RichPrediction }) {
   const style = CONFIDENCE_STYLE[conf] ?? CONFIDENCE_STYLE["Media"];
 
   const matchDate = new Date(match.match_date + (match.match_date.endsWith("Z") ? "" : "Z"));
-  const dateStr = matchDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
-  const timeStr = matchDate.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const dateStr = `${matchDate.getUTCDate()} ${MONTHS[matchDate.getUTCMonth()]} ${matchDate.getUTCFullYear()}`;
+  const timeStr = `${String(matchDate.getUTCHours()).padStart(2,"0")}:${String(matchDate.getUTCMinutes()).padStart(2,"0")} UTC`;
 
   const stageLabel = STAGE_LABEL[match.stage ?? ""] ?? match.stage ?? "";
   const isFinished = match.status === "finished";
+  const isLive = match.status === "live";
+  const msUntil = matchDate.getTime() - Date.now();
+  const hoursUntil = msUntil / 3600000;
+  const countdown =
+    isLive ? null :
+    isFinished ? null :
+    hoursUntil < 0 ? "Próximamente" :
+    hoursUntil < 1 ? `${Math.round(hoursUntil * 60)}min` :
+    hoursUntil < 24 ? `${Math.floor(hoursUntil)}h ${Math.round((hoursUntil % 1) * 60)}min` :
+    `${Math.ceil(hoursUntil / 24)} días`;
 
   return (
-    <div className={`bg-slate-800/80 rounded-xl border-l-4 ${style.border} p-4 space-y-3 hover:bg-slate-800 transition-colors`}>
+    <Link href={`/partido/${match.match_id}`} className={`block bg-slate-800/80 rounded-xl border-l-4 ${style.border} p-4 space-y-3 hover:bg-slate-800 hover:ring-1 hover:ring-slate-600 transition-all cursor-pointer`}>
       {/* Header */}
       <div className="flex items-center justify-between text-xs text-slate-400">
         <span>{stageLabel}</span>
-        <span>{dateStr} · {timeStr} UTC</span>
+        <div className="flex items-center gap-2">
+          {isLive && (
+            <span className="flex items-center gap-1 text-green-400 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+              EN VIVO
+            </span>
+          )}
+          {countdown && <span className="text-yellow-400 font-medium">⏱ {countdown}</span>}
+          <span>{dateStr} · {timeStr}</span>
+        </div>
       </div>
 
       {/* Teams */}
@@ -134,6 +155,6 @@ export default function MatchCard({ match }: { match: RichPrediction }) {
           </span>
         </div>
       )}
-    </div>
+    </Link>
   );
 }

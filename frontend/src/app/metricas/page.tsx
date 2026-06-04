@@ -24,7 +24,7 @@ export default async function MetricasPage() {
     data = await api.metrics();
   } catch { /* API offline */ }
 
-  if (!data || !data.metrics) {
+  if (!data || !data.metrics || !data.metrics.accuracy) {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-bold">Métricas del Modelo</h1>

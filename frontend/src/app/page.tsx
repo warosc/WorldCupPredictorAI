@@ -3,6 +3,7 @@ import { api, type RichPrediction } from "@/lib/api";
 import MatchCard from "@/components/MatchCard";
 import RankingsWidget from "@/components/RankingsWidget";
 import GenerateButton from "@/components/GenerateButton";
+import AutoRefresh from "@/components/AutoRefresh";
 
 export default async function Dashboard() {
   const [richPreds, rankings, overview] = await Promise.allSettled([
@@ -40,6 +41,7 @@ export default async function Dashboard() {
 
   return (
     <div className="space-y-10 max-w-7xl mx-auto">
+      <AutoRefresh intervalMs={300_000} />
 
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-800 via-blue-950 to-slate-900 border border-slate-700 p-6 md:p-8">

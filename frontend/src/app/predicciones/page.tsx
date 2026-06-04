@@ -80,9 +80,12 @@ export default async function PrediccionesPage({
         {Object.entries(byDate).map(([date, dayMatches]) => (
           <div key={date} className="mb-8">
             <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-3">
-              {new Date(date + "T12:00:00Z").toLocaleDateString("es-MX", {
-                weekday: "long", day: "numeric", month: "long",
-              })}
+              {(() => {
+                const d = new Date(date + "T12:00:00Z");
+                const DAYS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+                const MONTHS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+                return `${DAYS[d.getUTCDay()]}, ${d.getUTCDate()} de ${MONTHS[d.getUTCMonth()]}`;
+              })()}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {dayMatches.map((m) => (
