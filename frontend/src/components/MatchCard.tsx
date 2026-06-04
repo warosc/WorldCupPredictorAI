@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import type { RichPrediction } from "@/lib/api";
 
-const CONFIDENCE_STYLE: Record<string, { border: string; badge: string; label: string }> = {
-  "Muy Alta": { border: "border-green-500",  badge: "bg-green-500/20 text-green-300",  label: "Muy Alta" },
-  "Alta":     { border: "border-blue-500",   badge: "bg-blue-500/20 text-blue-300",    label: "Alta" },
-  "Media":    { border: "border-yellow-500", badge: "bg-yellow-500/20 text-yellow-300", label: "Media" },
-  "Baja":     { border: "border-red-500",    badge: "bg-red-500/20 text-red-300",      label: "Baja" },
+const CONFIDENCE_STYLE: Record<string, { border: string; badge: string }> = {
+  "Muy Alta": { border: "border-green-500",  badge: "bg-green-500/20 text-green-300" },
+  "Alta":     { border: "border-blue-500",   badge: "bg-blue-500/20 text-blue-300" },
+  "Media":    { border: "border-yellow-500", badge: "bg-yellow-500/20 text-yellow-300" },
+  "Baja":     { border: "border-red-500",    badge: "bg-red-500/20 text-red-300" },
 };
 
 const REC_LABEL: Record<string, string> = { "1": "LOCAL", "X": "EMPATE", "2": "VISITANTE" };
@@ -18,13 +19,24 @@ const REC_COLOR: Record<string, string> = {
 };
 
 const STAGE_LABEL: Record<string, string> = {
-  GROUP_STAGE: "Fase de Grupos",
-  LAST_16: "Octavos de Final",
-  QUARTER_FINALS: "Cuartos de Final",
-  SEMI_FINALS: "Semifinal",
-  THIRD_PLACE: "Tercer Puesto",
-  FINAL: "Final",
+  GROUP_STAGE: "Fase de Grupos", GROUP_A: "Grupo A", GROUP_B: "Grupo B",
+  GROUP_C: "Grupo C", GROUP_D: "Grupo D", GROUP_E: "Grupo E", GROUP_F: "Grupo F",
+  GROUP_G: "Grupo G", GROUP_H: "Grupo H", GROUP_I: "Grupo I", GROUP_J: "Grupo J",
+  GROUP_K: "Grupo K", GROUP_L: "Grupo L",
+  LAST_16: "Octavos", QUARTER_FINALS: "Cuartos", SEMI_FINALS: "Semifinal",
+  THIRD_PLACE: "3er Puesto", FINAL: "Final",
 };
+
+const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+function utcDate(iso: string) {
+  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
+  return {
+    date: `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`,
+    time: `${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")} UTC`,
+    ms: d.getTime(),
+  };
+}
 
 function ProbBar({ label, prob, color }: { label: string; prob: number; color: string }) {
   return (
@@ -34,7 +46,7 @@ function ProbBar({ label, prob, color }: { label: string; prob: number; color: s
         <span className="font-mono font-semibold text-slate-200">{(prob * 100).toFixed(1)}%</span>
       </div>
       <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${prob * 100}%` }} />
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${prob * 100}%` }} />
       </div>
     </div>
   );
@@ -44,12 +56,8 @@ function TeamCrest({ crest_url, name, code }: { crest_url: string | null; name: 
   if (crest_url) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={crest_url}
-        alt={name}
-        className="w-10 h-10 object-contain"
-        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-      />
+      <img src={crest_url} alt={name} className="w-10 h-10 object-contain"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
     );
   }
   return (
@@ -59,31 +67,42 @@ function TeamCrest({ crest_url, name, code }: { crest_url: string | null; name: 
   );
 }
 
+// Isolated client component — only this part differs between SSR and browser
+function Countdown({ matchMs, isLive }: { matchMs: number; isLive: boolean }) {
+  const [label, setLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    function calc() {
+      if (isLive) { setLabel(null); return; }
+      const h = (matchMs - Date.now()) / 3_600_000;
+      if (h < 0)      setLabel(null);
+      else if (h < 1)  setLabel(`${Math.round(h * 60)}min`);
+      else if (h < 24) setLabel(`${Math.floor(h)}h ${Math.round((h % 1) * 60)}min`);
+      else             setLabel(`${Math.ceil(h / 24)} días`);
+    }
+    calc();
+    const id = setInterval(calc, 60_000);
+    return () => clearInterval(id);
+  }, [matchMs, isLive]);
+
+  if (!label) return null;
+  return <span className="text-yellow-400 font-medium text-xs">⏱ {label}</span>;
+}
+
 export default function MatchCard({ match }: { match: RichPrediction }) {
   const p = match.prediction;
   const conf = p?.confidence ?? "Media";
   const style = CONFIDENCE_STYLE[conf] ?? CONFIDENCE_STYLE["Media"];
-
-  const matchDate = new Date(match.match_date + (match.match_date.endsWith("Z") ? "" : "Z"));
-  const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-  const dateStr = `${matchDate.getUTCDate()} ${MONTHS[matchDate.getUTCMonth()]} ${matchDate.getUTCFullYear()}`;
-  const timeStr = `${String(matchDate.getUTCHours()).padStart(2,"0")}:${String(matchDate.getUTCMinutes()).padStart(2,"0")} UTC`;
-
+  const { date: dateStr, time: timeStr, ms: matchMs } = utcDate(match.match_date);
   const stageLabel = STAGE_LABEL[match.stage ?? ""] ?? match.stage ?? "";
   const isFinished = match.status === "finished";
   const isLive = match.status === "live";
-  const msUntil = matchDate.getTime() - Date.now();
-  const hoursUntil = msUntil / 3600000;
-  const countdown =
-    isLive ? null :
-    isFinished ? null :
-    hoursUntil < 0 ? "Próximamente" :
-    hoursUntil < 1 ? `${Math.round(hoursUntil * 60)}min` :
-    hoursUntil < 24 ? `${Math.floor(hoursUntil)}h ${Math.round((hoursUntil % 1) * 60)}min` :
-    `${Math.ceil(hoursUntil / 24)} días`;
 
   return (
-    <Link href={`/partido/${match.match_id}`} className={`block bg-slate-800/80 rounded-xl border-l-4 ${style.border} p-4 space-y-3 hover:bg-slate-800 hover:ring-1 hover:ring-slate-600 transition-all cursor-pointer`}>
+    <Link
+      href={`/partido/${match.match_id}`}
+      className={`block bg-slate-800/80 rounded-xl border-l-4 ${style.border} p-4 space-y-3 hover:bg-slate-800 hover:ring-1 hover:ring-slate-600 transition-all`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between text-xs text-slate-400">
         <span>{stageLabel}</span>
@@ -94,21 +113,19 @@ export default function MatchCard({ match }: { match: RichPrediction }) {
               EN VIVO
             </span>
           )}
-          {countdown && <span className="text-yellow-400 font-medium">⏱ {countdown}</span>}
+          <Countdown matchMs={matchMs} isLive={isLive} />
           <span>{dateStr} · {timeStr}</span>
         </div>
       </div>
 
       {/* Teams */}
       <div className="flex items-center gap-3">
-        {/* Home */}
         <div className="flex-1 flex flex-col items-center gap-1.5">
           <TeamCrest crest_url={match.home_team.crest_url} name={match.home_team.name} code={match.home_team.code} />
           <span className="text-sm font-semibold text-center leading-tight">{match.home_team.name}</span>
           <span className="text-xs text-slate-500">ELO {match.home_team.elo_rating.toFixed(0)}</span>
         </div>
 
-        {/* Score / VS */}
         <div className="text-center px-2">
           {isFinished ? (
             <span className="text-2xl font-bold font-mono text-white">
@@ -116,9 +133,7 @@ export default function MatchCard({ match }: { match: RichPrediction }) {
             </span>
           ) : (
             <div className="space-y-0.5">
-              <p className="text-xs text-slate-500 font-mono">
-                {p?.most_likely_score ?? "?-?"}
-              </p>
+              <p className="text-xs text-slate-500 font-mono">{p?.most_likely_score ?? "?-?"}</p>
               <p className="text-slate-600 font-bold text-sm">VS</p>
               {p?.score_probability && (
                 <p className="text-xs text-slate-500">{(p.score_probability * 100).toFixed(1)}%</p>
@@ -127,7 +142,6 @@ export default function MatchCard({ match }: { match: RichPrediction }) {
           )}
         </div>
 
-        {/* Away */}
         <div className="flex-1 flex flex-col items-center gap-1.5">
           <TeamCrest crest_url={match.away_team.crest_url} name={match.away_team.name} code={match.away_team.code} />
           <span className="text-sm font-semibold text-center leading-tight">{match.away_team.name}</span>
