@@ -185,13 +185,6 @@ export default async function MiQuinielaPage() {
         </table>
       </div>
 
-      <style jsx global>{`
-        @media print {
-          nav, .no-print, button { display: none !important; }
-          body { background: white !important; }
-          #quiniela-print { page-break-inside: avoid; }
-        }
-      `}</style>
     </div>
   );
 }

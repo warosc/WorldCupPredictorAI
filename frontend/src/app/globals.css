@@ -12,3 +12,10 @@ body {
   color: var(--foreground);
   font-family: system-ui, -apple-system, sans-serif;
 }
+
+@media print {
+  nav, .no-print, button { display: none !important; }
+  body { background: white !important; color: black !important; }
+  #quiniela-print { page-break-inside: avoid; }
+  .print\:hidden { display: none !important; }
+}

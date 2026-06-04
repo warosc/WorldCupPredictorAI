@@ -84,11 +84,10 @@ function Crest({ url, name, code, size = 40 }: { url: string | null; name: strin
   // Fallback: colored circle with 2-letter code
   return (
     <div
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, fontSize: size * 0.3 }}
       className="rounded-full bg-gradient-to-br from-slate-600 to-slate-700 border border-slate-500 flex items-center justify-center font-bold text-slate-200"
-      style2={{ fontSize: size * 0.3 }}
     >
-      <span style={{ fontSize: size * 0.3 }}>{code.slice(0, 2).toUpperCase()}</span>
+      {code.slice(0, 2).toUpperCase()}
     </div>
   );
 }
