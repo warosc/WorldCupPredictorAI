@@ -104,9 +104,13 @@ async def sync_worldcup(db: AsyncSession = Depends(get_db)):
             existing = await db.execute(select(Team).where(Team.name == name))
             team = existing.scalar_one_or_none()
 
+            crest = ft.get("crest") or ft.get("crestUrl") or None
+
             if team:
                 team.code = tla
                 team.confederation = confederation
+                if crest:
+                    team.crest_url = crest
                 teams_updated += 1
             else:
                 team = Team(
@@ -115,6 +119,7 @@ async def sync_worldcup(db: AsyncSession = Depends(get_db)):
                     code=tla,
                     confederation=confederation,
                     elo_rating=1500.0,
+                    crest_url=crest,
                 )
                 db.add(team)
                 teams_created += 1

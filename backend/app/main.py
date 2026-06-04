@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from sqlalchemy import text
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -19,6 +20,10 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add crest_url column if it doesn't exist (safe migration)
+        await conn.execute(text(
+            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS crest_url VARCHAR(500)"
+        ))
     yield
 
 

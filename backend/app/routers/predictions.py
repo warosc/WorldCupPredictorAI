@@ -1,8 +1,9 @@
 from uuid import UUID, uuid4
 from datetime import datetime
+from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -20,8 +21,69 @@ router = APIRouter(prefix="/predictions", tags=["predictions"])
 
 @router.get("/", response_model=list[PredictionOut])
 async def list_predictions(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Prediction).order_by(Prediction.created_at.desc()).limit(50))
+    result = await db.execute(select(Prediction).order_by(Prediction.created_at.desc()).limit(100))
     return result.scalars().all()
+
+
+@router.get("/rich", summary="Predicciones enriquecidas con datos de equipos y partido")
+async def rich_predictions(
+    status: str | None = Query(None, description="scheduled | finished | live"),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(Match)
+        .options(
+            joinedload(Match.home_team),
+            joinedload(Match.away_team),
+            joinedload(Match.predictions),
+        )
+        .order_by(Match.match_date)
+    )
+    if status:
+        query = query.where(Match.status == status)
+
+    result = await db.execute(query)
+    matches = result.unique().scalars().all()
+
+    def _team(t: Team | None) -> dict:
+        if not t:
+            return {"id": None, "name": "TBD", "code": "?", "confederation": None,
+                    "fifa_ranking": None, "elo_rating": 1500.0, "crest_url": None}
+        return {
+            "id": str(t.id), "name": t.name, "code": t.code,
+            "confederation": t.confederation, "fifa_ranking": t.fifa_ranking,
+            "elo_rating": t.elo_rating,
+            "crest_url": getattr(t, "crest_url", None),
+        }
+
+    output = []
+    for m in matches:
+        latest_pred = None
+        if m.predictions:
+            p = sorted(m.predictions, key=lambda x: x.created_at, reverse=True)[0]
+            latest_pred = {
+                "id": str(p.id), "match_id": str(p.match_id),
+                "home_win_prob": p.home_win_prob, "draw_prob": p.draw_prob,
+                "away_win_prob": p.away_win_prob,
+                "predicted_home_goals": p.predicted_home_goals,
+                "predicted_away_goals": p.predicted_away_goals,
+                "most_likely_score": p.most_likely_score,
+                "score_probability": p.score_probability,
+                "confidence": p.confidence,
+                "quiniela_recommendation": p.quiniela_recommendation,
+            }
+        output.append({
+            "match_id": str(m.id),
+            "match_date": m.match_date.isoformat() if m.match_date else None,
+            "stage": m.stage,
+            "status": m.status,
+            "home_goals": m.home_goals,
+            "away_goals": m.away_goals,
+            "home_team": _team(m.home_team),
+            "away_team": _team(m.away_team),
+            "prediction": latest_pred,
+        })
+    return output
 
 
 @router.get("/match/{match_id}", response_model=PredictionOut)

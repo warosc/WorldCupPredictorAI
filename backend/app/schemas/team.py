@@ -18,6 +18,7 @@ class TeamOut(BaseModel):
     confederation: str | None
     fifa_ranking: int | None
     elo_rating: float
+    crest_url: str | None = None
     updated_at: datetime
 
     model_config = {"from_attributes": True}

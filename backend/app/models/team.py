@@ -17,6 +17,7 @@ class Team(Base):
     confederation = Column(String(50))
     fifa_ranking = Column(Integer)
     elo_rating = Column(Float, default=1500.0)
+    crest_url = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

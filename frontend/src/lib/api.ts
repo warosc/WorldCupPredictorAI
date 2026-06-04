@@ -1,8 +1,14 @@
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Server-side: use internal Docker hostname. Browser: use host machine URL.
+const API =
+  typeof window === "undefined"
+    ? process.env.INTERNAL_API_URL || "http://api:8000"
+    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export const CLIENT_API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function fetcher<T>(path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`, { next: { revalidate: 60 } });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  const res = await fetch(`${API}${path}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
   return res.json();
 }
 
@@ -13,6 +19,7 @@ export interface Team {
   confederation: string | null;
   fifa_ranking: number | null;
   elo_rating: number;
+  crest_url: string | null;
 }
 
 export interface Match {
@@ -32,10 +39,22 @@ export interface Prediction {
   home_win_prob: number;
   draw_prob: number;
   away_win_prob: number;
+  predicted_home_goals: number | null;
+  predicted_away_goals: number | null;
   most_likely_score: string | null;
   score_probability: number | null;
   confidence: string | null;
   quiniela_recommendation: string | null;
+}
+
+export interface RichPrediction {
+  match_id: string;
+  match_date: string;
+  stage: string | null;
+  status: string;
+  home_team: Team;
+  away_team: Team;
+  prediction: Prediction | null;
 }
 
 export interface RankingEntry {
@@ -46,6 +65,9 @@ export interface RankingEntry {
   fifa_ranking: number | null;
   form_score: number | null;
   tournament_points: number;
+  goals_for: number;
+  goals_against: number;
+  matches_played: number;
 }
 
 export interface MatchPick {
@@ -120,15 +142,18 @@ export const api = {
   matches: (status?: string) => fetcher<Match[]>(`/matches/${status ? `?status=${status}` : ""}`),
   rankings: () => fetcher<RankingEntry[]>("/rankings/"),
   predictions: () => fetcher<Prediction[]>("/predictions/"),
+  richPredictions: (status?: string) =>
+    fetcher<RichPrediction[]>(`/predictions/rich${status ? `?status=${status}` : ""}`),
   quiniela: (strategy: string) => fetcher<QuinielaRec>(`/quiniela/recommendations/${strategy}`),
-  worldcupOverview: () => fetcher<{ total_matches: number; matches_played: number; matches_remaining: number }>("/worldcup/overview"),
+  worldcupOverview: () =>
+    fetcher<{ total_matches: number; matches_played: number; matches_remaining: number }>("/worldcup/overview"),
   trends: () => fetcher<TrendsData>("/trends/"),
   metrics: () => fetcher<ModelMetrics>("/metrics/model"),
   compareTeams: (homeId: string, awayId: string) =>
     fetcher<CompareResult>(`/teams/compare?home_id=${homeId}&away_id=${awayId}`),
   simulation: (matchId: string) => fetcher<SimulationOut>(`/simulations/match/${matchId}`),
   aiQuery: async (question: string): Promise<{ answer: string }> => {
-    const res = await fetch(`${API}/ai/query`, {
+    const res = await fetch(`${CLIENT_API}/ai/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
