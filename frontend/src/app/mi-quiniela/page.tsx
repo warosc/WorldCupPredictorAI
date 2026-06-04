@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import AutoRefresh from "@/components/AutoRefresh";
+import PrintButton from "@/components/PrintButton";
 
 const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
@@ -76,13 +77,7 @@ export default async function MiQuinielaPage() {
             Generada automáticamente por ensemble ELO + Poisson + Monte Carlo · {picks.length} partidos
           </p>
         </div>
-        <button
-          onClick={() => {}} // handled by print CSS
-          className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium"
-          onMouseUp={() => window.print()}
-        >
-          🖨 Imprimir / Guardar PDF
-        </button>
+        <PrintButton />
       </div>
 
       {/* Strategy summary */}
